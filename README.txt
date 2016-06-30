@@ -1,0 +1,2 @@
+Design of a protocol based on Ricart & Agrawalas mutual exclusion algorithm and implemented this protocol. 
+Design of graphical user interface (GUI) to display the movement of people from one town to another town. 

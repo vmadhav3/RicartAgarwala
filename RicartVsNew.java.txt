@@ -1,0 +1,279 @@
+package distributed_os_final;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.concurrent.BlockingQueue;
+
+/*Using thread interface to emulate the motion of the moving 
+ * persons. The desired protocol is implemented prior to a person's
+ * entry into the critical section i.e. bridge between the towns
+ *  */
+
+public class RicartVsNew extends Thread {
+	
+	/*The array contains the position of the end-points of a 
+	 *line that corresponds with the outline of the towns and
+	 *bridge. These points together form the route path that is
+	 *followed by the moving person. The x and y coordinates of 
+	 *the towns and bridge are adjusted according to the diameter
+	 *of the persons (oval) so as to keep the persons aligned to 
+	 *the outline.  */
+	
+	public int[][] route = {{175,123,25,193},
+			{25,193,25,53},
+			{25,53,175,123},
+			{175,123,295,123}, //moving from left to right on the bridge
+			{295,123,444,54},
+			{444,54,444,193},
+			{444,193,295,123},
+			{295,123,175,123}}; //moving from right to left on the bridge
+
+	//For knowing the line on which the person is located at that instant
+	public int routeValue = 0;
+	//determines the point on the current line
+	public double speed, linePos = 0;
+	
+	public boolean continueExecution;
+	//is true when a person is on bridge (CS) and all acknowledgement are received.
+	
+	public boolean proceed = false;
+	//determines if any person is on the bridge (CS)
+	
+	boolean inBridge = false;
+	Long myRequestTime = (long) 0;
+	int countAck = 0;
+	private String protocol; //Ricart or New
+	
+	//Queue for the current thread
+	MyQueue myQueue;
+	
+	//Queue for the other threads
+	MyQueue otherQueue1;
+	MyQueue otherQueue2;
+	MyQueue otherQueue3;
+	
+	//Queue for which the values are to be updated
+	MyQueue displayQueue;
+
+	// Waiting queue for the person's thread waiting for acknowledgement
+	ArrayList<MyQueue> waitingQueue = new ArrayList<MyQueue>();
+
+	
+	/* Constructor for the class that takes the queue and the 
+	 * speed associated to a person, its color (blue or red)
+	 * and the protocol to be implemented.
+	 * The queue has an array of
+	 * queues in which the first element is the queue of that process
+	 * itself and the other queues have the reference to the other threads */
+	
+	public RicartVsNew(BlockingQueue<ArrayList<MyQueue>> queue, double newSpeed, String role, String protocol)
+	{
+		this.continueExecution = true;
+		ArrayList<MyQueue> array = queue.poll();
+		this.myQueue = array.get(0);
+		this.otherQueue1 = array.get(1);
+		this.otherQueue2 = array.get(2);
+		this.otherQueue3 = array.get(3);
+		this.speed = newSpeed;
+		this.displayQueue = array.get(4);
+		this.protocol = protocol; //Ricart or New protocol
+		
+		//Left town has blue persons, right town has red persons 
+		if( role == "blue") 
+			routeValue = 2;
+		else
+			routeValue = 5;
+	}
+
+	
+	/* This method keeps the person moving on the route that was established
+	 * for moving across the two towns through a bridge. For a person to enter
+	 * the bridge, it has to send requests to all other persons. The person's
+	 * thread keeps track of the queue for the requests. When an acknowledgment 
+	 * is received, the count of the acknowledgement is increased by 1. When the count
+	 * of acknowledgement reaches to 3 i.e. a person receives acknowledgement from 
+	 * remaining three persons, then its proceed becomes true. A person sends ack 
+	 * to another person only when its own thread is not being executed in the bridge
+	 * or the time-stamp of that requesting person is lesser than his own time-stamp.
+	 * The queue name is used to break the tie if the requesting process has the same
+	 * time-stamp.*/
+	
+	@Override
+	public void run() 
+	{
+		//keep moving the persons
+		while(continueExecution)
+		{
+			//checks whether the queue is empty or not
+			if(myQueue.getQueue().isEmpty())
+			{
+				//No one in bridge or received acknowledgement from all
+				if(inBridge == false || proceed == true)
+				{
+					//move the person on the route path
+					linePos = linePos + speed/400;
+					if (linePos >1)
+					{
+						linePos = linePos - 1;
+						routeValue = (routeValue + 1)%8;
+						
+						/*route value of 3 and 7 means that the thread of a
+						 * person is being executed in the bridge */
+						if(routeValue == 3 || routeValue == 7)
+						{
+							/*If someone is on the bridge, send request and don't
+							 * proceed. Keep track of the request time.*/
+							inBridge = true;
+							proceed = false;
+							myRequestTime = new Date().getTime();
+							if(protocol == "Ricart"){
+								otherQueue1.getQueue().add(myQueue.getQueueName() + " " + myRequestTime);
+								otherQueue2.getQueue().add(myQueue.getQueueName() + " " + myRequestTime);
+								otherQueue3.getQueue().add(myQueue.getQueueName() + " " + myRequestTime);
+							} 
+							
+							/*If implementing new protocol, keep track of the routeValue
+							 * as well so that the direction can be resolved for more than
+							 * one person to be on the bridge if they are following the same direction.*/
+							else {
+								otherQueue1.getQueue().add(myQueue.getQueueName() + " " + myRequestTime + " " + routeValue);
+								otherQueue2.getQueue().add(myQueue.getQueueName() + " " + myRequestTime + " " + routeValue);
+								otherQueue3.getQueue().add(myQueue.getQueueName() + " " + myRequestTime + " " + routeValue);
+							}
+							
+							continue;
+						}
+						/*routeValue of 0 and 4 represents the path just outside of
+						 * the bridge in the two directions */ 
+						else if(routeValue == 0 || routeValue == 4)
+						{
+							/*Send ack to the waiting threads once you come out 
+							 * of the bridge*/
+							inBridge = false;
+							while(!waitingQueue.isEmpty())
+							{
+								MyQueue waitingclass = waitingQueue.get(0);
+								waitingQueue.remove(0);
+								waitingclass.getQueue().add("ack");
+							}
+
+						}
+					}
+					//Do location update for the persons
+					int x =(int) (route[routeValue][0]*(1-linePos) + linePos*route[routeValue][2]);
+					int y =(int) (route[routeValue][1]*(1-linePos) + linePos*route[routeValue][3]);
+					//send the updated values to display queue for displaying
+					displayQueue.getQueue().add(myQueue.getQueueName() + " " + x + " " + y);
+					try{Thread.sleep(20);}catch(Exception e){}
+				}
+			}
+			else
+			{
+				//retrieve all the messages in the queue.
+				while(!myQueue.getQueue().isEmpty())
+				{
+					String message = myQueue.getQueue().poll();
+					if("ack".equals(message))
+					{
+						countAck++;
+						if(countAck == 3)
+						{
+							proceed = true; //proceed into bridge
+							countAck = 0; // for next entry into bridge
+						}
+					}
+					else
+					{
+						String requestQueueName = message.split(" ")[0];
+						MyQueue requestQueueClass;
+						if(otherQueue1.getQueueName().equals(requestQueueName))
+							requestQueueClass = otherQueue1;
+						else if(otherQueue2.getQueueName().equals(requestQueueName))
+							requestQueueClass = otherQueue2;
+						else
+							requestQueueClass = otherQueue3;
+						long otherRequestTime = new Long(message.split(" ")[1]);
+						
+						// For Ricart Aggarwala algorithm
+						if(protocol == "Ricart"){
+							
+							/* If someone is in bridge and someone else has requested 
+							 * access to the bridge before you, then wait */  
+							if(inBridge == true && myRequestTime < otherRequestTime)
+							{
+								waitingQueue.add(requestQueueClass);
+	
+							}
+							
+							/* If someone is in bridge and someone else has requested 
+							 * access to the bridge at the same time as yours, then compare
+							 * the ID to decide who goes first */  
+							else if(inBridge == true && myRequestTime == otherRequestTime)
+							{
+								if(new Integer(requestQueueClass.getQueueName().charAt(5))>
+								new Integer(myQueue.getQueueName().charAt(5)))
+								{
+									//wait if you loose
+									waitingQueue.add(requestQueueClass);
+								}
+								else
+								{
+									// get ack if your ID is greater
+									requestQueueClass.getQueue().add("ack");
+								}
+								
+							}
+							else
+							{
+								/*If someone is in bridge and you have the lowest time-stamp 
+								 * compared to the other two persons, get ack from them.*/
+								requestQueueClass.getQueue().add("ack");
+							}
+						} 
+						
+						/* In the new protocol, more than one person can be on the bridge
+						 * provided that they are moving in the same direction.*/
+						else { 
+							int requestRouteValue = new Integer(message.split(" ")[2]);
+							
+							/*Wait if someone is in bridge moving in opposite direction than
+							 * yours and someone else has already requested before you.*/
+							if(inBridge == true && myRequestTime < otherRequestTime && requestRouteValue != routeValue)
+							{
+								waitingQueue.add(requestQueueClass);
+							}
+							// Compare IDs if the time-stamps are equal
+							else if(inBridge == true && myRequestTime == otherRequestTime && requestRouteValue != routeValue)
+							{
+								
+								if(new Integer(requestQueueClass.getQueueName().charAt(5))>
+								new Integer(myQueue.getQueueName().charAt(5)))
+								{
+									//wait if your ID is smaller
+									waitingQueue.add(requestQueueClass);
+								}
+								else
+								{
+									//get ack if your ID is bigger
+									requestQueueClass.getQueue().add("ack");
+								}
+							}
+							/*Get ack from all others if the bridge is empty or if you are moving in the same
+							 * direction as that of the person already on the bridge. Get ack from the persons 
+							 * who made request after you. */
+							else
+							{
+								requestQueueClass.getQueue().add("ack");
+
+							}
+						}
+
+					}
+				}
+			}
+
+		}
+
+	}
+
+}

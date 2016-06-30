@@ -1,0 +1,421 @@
+package distributed_os_final;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.util.ArrayList;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SpringLayout;
+
+@SuppressWarnings("serial")
+public class Display extends JComponent implements ActionListener
+{
+	//Making our display using JFrame and JPanel
+	JFrame frame1= new JFrame("MOVEMENT OF PEOPLE ACCORDING TO MUTUAL EXCLUSION ALGORITHM");
+	JPanel panel = new JPanel();
+	
+
+	Container pane = frame1.getContentPane();
+	
+	//controls the speed of the objects
+	double[] speed = {0,0,0,0};
+	
+	//labels and text fields for accepting the user input.
+	JLabel jlabelSpeed1 = new JLabel("Speed of person P ?");
+	JLabel jlabelSpeed2 = new JLabel("Speed of person Q ?");
+	JLabel jlabelSpeed3 = new JLabel("Speed of person R ?");
+	JLabel jlabelSpeed4 = new JLabel("Speed of person S ?");
+	
+	
+	JTextField jtextSpeed1 = new JTextField();
+	JTextField jtextSpeed2 = new JTextField();
+	JTextField jtextSpeed3 = new JTextField();
+	JTextField jtextSpeed4 = new JTextField();
+	
+	//Click enabled buttons to run the protocols
+	JButton ricartAgarwala = new JButton("Ricart Aggarwala");
+	JButton newProtocol = new JButton("New Protocol");
+	
+	
+	//Current position displaying queue for the person
+	BlockingQueue<String> displayQueue = new LinkedBlockingQueue<String>();
+	boolean contExecution = true;
+	
+	//Starting position for person P, Q, R and S 
+	int[][] pos = {{25,53},{25,53},{444,54},{444,54}};
+	
+	//List of queue in the blocking queue for the threads to get their queues dynamically
+	BlockingQueue<ArrayList<MyQueue>> queue = new LinkedBlockingQueue<ArrayList<MyQueue>>();
+	
+	//Threads which implement the Ricart-Aggarwala algorithm
+	RicartVsNew Rthread_P;
+	RicartVsNew Rthread_Q;
+	RicartVsNew Rthread_R;
+	RicartVsNew Rthread_S;
+	
+	//Threads which implement the New Protocol
+	RicartVsNew Nthread_P;
+	RicartVsNew Nthread_Q;
+	RicartVsNew Nthread_R;
+	RicartVsNew Nthread_S;
+	
+	//Initializing the buttons with constructor
+	public Display()
+	{
+		ricartAgarwala.setActionCommand("RicartAgarwala");
+		ricartAgarwala.setEnabled(true);
+		ricartAgarwala.addActionListener(this);
+
+		newProtocol.setActionCommand("NewProtocol");
+		newProtocol.setEnabled(true);
+		newProtocol.addActionListener(this);
+					
+	}
+	
+	/* Setting up the screen for visualizing the program.
+	 * The function checks for the new positions of the moving person from
+	 * the displayQueue dynamically by starting a thread and shows the updated
+	 * position on the screen 
+	 */
+	
+	public void screenVisualizationSetup ()
+	{
+		//Setting up the speed of the person when that JLabel is clicked
+		
+		jtextSpeed1.addFocusListener(new FocusListener() {
+		    public void focusGained(FocusEvent clicked) {
+		    	jtextSpeed1.setText("");
+		    }
+
+		    public void focusLost(FocusEvent clicked) {
+		        // when not clicked stay idle
+		    }
+		});
+		jtextSpeed2.addFocusListener(new FocusListener() {
+		    public void focusGained(FocusEvent clicked) {
+		    	jtextSpeed2.setText("");
+		    }
+
+		    public void focusLost(FocusEvent clicked) {
+		    	// when not clicked stay idle
+		    }
+		});
+		jtextSpeed3.addFocusListener(new FocusListener() {
+		    public void focusGained(FocusEvent clicked) {
+		    	jtextSpeed3.setText("");
+		    }
+
+		    public void focusLost(FocusEvent clicked) {
+		    	// when not clicked stay idle
+		    }
+		});
+		jtextSpeed4.addFocusListener(new FocusListener() {
+		    public void focusGained(FocusEvent clicked) {
+		    	jtextSpeed4.setText("");
+		    }
+
+		    public void focusLost(FocusEvent clicked) {
+		    	// when not clicked stay idle
+		    }
+		});
+		
+		// Suggest the user to enter the speed of the person in the text field
+		jtextSpeed1.setText("Enter here");
+		jtextSpeed2.setText("Enter here");
+		jtextSpeed3.setText("Enter here");
+		jtextSpeed4.setText("Enter here"); 
+		
+		frame1.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		// Setting up the dimension for the frame
+		Dimension dim = new Dimension();
+		dim.setSize(500, 300);
+		this.setPreferredSize(dim);
+		
+		// Making the protocol buttons listen to the action performed on it by the user 
+		ricartAgarwala.setActionCommand("RicartAgarwala");
+		ricartAgarwala.setEnabled(true);
+		ricartAgarwala.addActionListener(this);
+
+		newProtocol.setActionCommand("NewProtocol");
+		newProtocol.setEnabled(true);
+		newProtocol.addActionListener(this);
+		
+		// Setting the layout for the JPanel
+		panel.setLayout(new SpringLayout());
+		
+		// Adding the protocol initiation button to the JPanel
+		panel.add(ricartAgarwala);
+		panel.add(newProtocol);
+		
+		/* Adding the user interactive text fields in JPanel to  
+		 * enter the speed of moving person
+		 */
+		panel.add(jlabelSpeed1);
+		panel.add(jtextSpeed1);
+		panel.add(jlabelSpeed2);
+		panel.add(jtextSpeed2);
+		panel.add(jlabelSpeed3);
+		panel.add(jtextSpeed3);
+		panel.add(jlabelSpeed4);
+		panel.add(jtextSpeed4);
+		
+
+		SpringUtilities.makeCompactGrid(panel, 5, 2, 2, 10, 2, 10);
+		
+		// Moving the person continuously by this thread
+		Thread movingPerson = new Thread() 
+		{
+			public void run()
+			{
+				while(true)
+				{
+					repaint();
+					try{Thread.sleep(10);}catch(Exception e){}
+				}
+
+			}
+		};
+
+		
+		pane.add(panel,BorderLayout.CENTER);
+		pane.add(this,BorderLayout.WEST);
+		
+		// Packing the GUI elements to the JFrame
+		frame1.pack();
+		frame1.setVisible(true);
+		// Start the thread to move the person continuously
+		movingPerson.start();
+	}
+
+	// Main method to start the program operation
+	public static void main(String[] args) {
+		
+		new Display().screenVisualizationSetup();
+
+	}
+
+	
+	/* Get the speed values entered by the users.
+	 * Throw an error message of the speed is not entered or is 0.
+	 * Using BlockingQueue for concurrency control by defining thread-safe 
+	 * queues and putting them in a queue. The threads can take up values from
+	 * the queue dynamically and is also able to access the queues of other threads.
+	 * */
+	@SuppressWarnings("deprecation")
+	public void actionPerformed(ActionEvent clicked) {
+		try
+		{
+			speed[0] = new Double(jtextSpeed1.getText());
+			speed[1] = new Double(jtextSpeed2.getText());
+			speed[2] = new Double(jtextSpeed3.getText());
+			speed[3] = new Double(jtextSpeed4.getText());
+			if(speed[0]<0 || speed[1]<0 || speed[2]<0 || speed[3]<0)
+			{
+				JOptionPane.showMessageDialog(null,
+				          "Error: Please input number greater than 0", "Error Message",
+				          JOptionPane.ERROR_MESSAGE);
+			}
+			else
+			{
+				BlockingQueue<String> queueP = new LinkedBlockingQueue<String>();
+				BlockingQueue<String> queueQ = new LinkedBlockingQueue<String>();
+				BlockingQueue<String> queueR = new LinkedBlockingQueue<String>();
+				BlockingQueue<String> queueS = new LinkedBlockingQueue<String>();
+				
+				
+			
+				MyQueue queueClassP = new MyQueue(queueP,"queueP");
+				MyQueue queueClassQ = new MyQueue(queueQ,"queueQ");
+				MyQueue queueClassR = new MyQueue(queueR,"queueR");
+				MyQueue queueClassS = new MyQueue(queueS,"queueS");
+				MyQueue displayClass = new MyQueue(displayQueue,"displayQueue");
+				
+				/* Array of queues for person P. Requests can be sent to the other persons
+				 * using the reference to their queue.*/
+				ArrayList<MyQueue> queueArray = new ArrayList<MyQueue>();
+				queueArray.add(queueClassP);
+				queueArray.add(queueClassQ);
+				queueArray.add(queueClassR);
+				queueArray.add(queueClassS);
+				queueArray.add(displayClass);
+				
+				//Queue array for person Q
+				queue.add(queueArray);
+				queueArray = new ArrayList<MyQueue>();
+				queueArray.add(queueClassQ);
+				queueArray.add(queueClassR);
+				queueArray.add(queueClassS);
+				queueArray.add(queueClassP);
+				queueArray.add(displayClass);
+				
+				//Queue array for person R
+				queue.add(queueArray);
+				queueArray = new ArrayList<MyQueue>();
+				queueArray.add(queueClassR);
+				queueArray.add(queueClassS);
+				queueArray.add(queueClassP);
+				queueArray.add(queueClassQ);
+				queueArray.add(displayClass);
+				
+				//Queue array for person S
+				queue.add(queueArray);
+				queueArray = new ArrayList<MyQueue>();
+				queueArray.add(queueClassS);
+				queueArray.add(queueClassP);
+				queueArray.add(queueClassQ);
+				queueArray.add(queueClassR);
+				queueArray.add(displayClass);
+				queue.add(queueArray);
+				queueArray = null;
+
+				/* When the protocol button is clicked, the threads that are
+				 * running for the persons are stopped */
+				if(null != Nthread_P)
+					Nthread_P.stop();
+				if(null != Nthread_Q)
+					Nthread_Q.stop();
+				if(null != Nthread_R)
+					Nthread_R.stop();
+				if(null != Nthread_S)
+					Nthread_S.stop();
+				if(null != Rthread_P)
+					Rthread_P.stop();
+				if(null != Rthread_P)
+					Rthread_Q.stop();
+				if(null != Rthread_P)
+					Rthread_R.stop();
+				if(null != Rthread_P)
+					Rthread_S.stop();
+				
+				/* When Ricart Agarwala button is clicked, run
+				 * the threads for the person to simulate this algorithm */
+				if("RicartAgarwala".equals(clicked.getActionCommand()))
+				{
+					this.Rthread_P = new RicartVsNew(queue,speed[0],"blue","Ricart");
+					Rthread_P.start();
+					this.Rthread_Q = new RicartVsNew(queue,speed[1],"blue","Ricart");
+					Rthread_Q.start();
+					this.Rthread_R = new RicartVsNew(queue,speed[2],"red","Ricart");
+					Rthread_R.start();
+					this.Rthread_S = new RicartVsNew(queue,speed[3],"red","Ricart");
+					Rthread_S.start();
+				} 
+				/* When New Protocol button is clicked, run
+				 * the threads for the person to simulate this protocol */
+				else if("NewProtocol".equals(clicked.getActionCommand())) {
+					this.Nthread_P = new RicartVsNew(queue,speed[0],"blue","New");
+					Nthread_P.start();
+					this.Nthread_Q = new RicartVsNew(queue,speed[1],"blue","New");
+					Nthread_Q.start();
+					this.Nthread_R = new RicartVsNew(queue,speed[2],"red","New");
+					Nthread_R.start();
+					this.Nthread_S = new RicartVsNew(queue,speed[3],"red","New");
+					Nthread_S.start();
+				}
+				
+			}
+		}
+		catch(NumberFormatException exception)
+		{
+			// Error message if the speed in not entered
+			JOptionPane.showMessageDialog(null,
+			          "Error: Please enter a valid number", "Error Message",
+			          JOptionPane.ERROR_MESSAGE);
+		}
+			
+	}
+	
+	
+	/* Function that takes a Graphics object. Using Graphics object,
+	 * we create the outline for the two towns and a bridge using drawLine.
+	 * The person is represented by in the form of ovals. Person P and Q are
+	 * blue in color and are in blue town A. Person R and S are red in color 
+	 * and are in red town B. The position of the person is changed dynamically
+	 * by enabling the thread   */
+	
+	public void paint(Graphics g) 
+	{
+		
+		Graphics2D g2D = (Graphics2D) g;
+		char[] alphs = {'P','Q','R','S'};
+		g2D.setColor(Color.BLACK);
+		g2D.drawLine(180,130,300,130);
+		g2D.setColor(Color.BLUE);
+		g2D.drawLine(30,60,180,130);
+		g2D.drawLine(30,200,180,130);
+		g2D.drawLine(30,60,30,200);
+		g2D.setColor(Color.RED);
+		g2D.drawLine(300,130,450,60);
+		g2D.drawLine(300,130,450,200);
+		g2D.drawLine(450,60,450,200);
+		
+		
+		while(!displayQueue.isEmpty())
+		{
+			String displayQueueMessage = displayQueue.poll();
+			
+			String[] message = displayQueueMessage.split(" ");
+			if(message[0].equalsIgnoreCase("queueP"))
+			{
+				pos[0][0] = new Integer(message[1]);
+				pos[0][1] = new Integer(message[2]);
+			}
+			else if(message[0].equalsIgnoreCase("queueQ"))
+			{
+				pos[1][0] = new Integer(message[1]);
+				pos[1][1] = new Integer(message[2]);
+				
+			}
+			else if(message[0].equalsIgnoreCase("queueR"))
+			{
+				pos[2][0] = new Integer(message[1]);
+				pos[2][1] = new Integer(message[2]);
+			}
+			else 
+			{
+				pos[3][0] = new Integer(message[1]);
+				pos[3][1] = new Integer(message[2]);
+			}
+		}
+		
+		g2D.setColor(Color.blue);
+		g2D.fillOval(pos[0][0], pos[0][1], 15, 15);
+		g2D.setColor(Color.black);
+		g2D.drawChars(alphs, 0, 1, pos[0][0], pos[0][1]);
+		
+		g2D.setColor(Color.blue);
+		g2D.fillOval(pos[1][0], pos[1][1], 15, 15);
+		g2D.setColor(Color.black);
+		g2D.drawChars(alphs, 1, 1, pos[1][0], pos[1][1]);
+
+		g2D.setColor(Color.red);
+		g2D.fillOval(pos[2][0], pos[2][1], 15, 15);
+		g2D.setColor(Color.black);
+		g2D.drawChars(alphs, 2, 1, pos[2][0], pos[2][1]);
+		
+		g2D.setColor(Color.red);
+		g2D.fillOval(pos[3][0], pos[3][1], 15, 15);
+		g2D.setColor(Color.black);
+		g2D.drawChars(alphs, 3, 1, pos[3][0], pos[3][1]);
+		
+
+	}
+
+
+}
